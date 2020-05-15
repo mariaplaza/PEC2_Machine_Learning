@@ -1,5 +1,5 @@
 ---
-title: 'PEC 2 Machine Learning'
+title: '<center> <h1>PEC 2  - Machine Learning</h1> </center>'
 author: "María Plaza García"
 subtitle: '`r params$subtitulo`'
 date: '`r format(Sys.Date(),"%e de %B, %Y")`' 
@@ -27,9 +27,9 @@ nocite: |
 header-includes:
   - \usepackage[spanish]{babel}
 params:
-  file1: peptidos_transf_one_hot.csv
-  file2: peptidos.csv
-  folder.data: dataset
+  file1: peptidos.csv
+  file2: peptidos_transf_one_hot1.csv
+  folder.data: ./dataset
   p.train: !r 2/3
   subtitulo: Predicción de interacción entre péptido y el complejo mayor de histocompatibilidad tipo I con Artificial Neural Networks (ANN) y Support Vector Machines (SVM)
   seed.train: 123
@@ -152,7 +152,7 @@ Hemos incluido varios parámetros en el encabezado `YAML` del documento cuyos va
 ```{r datos,message=FALSE,warning=FALSE}
 # Ahora ya se importan los datos a formato data.frame
 library(readr)
-peptidos <- read_delim(file=file.path(params$folder.data,params$file2),
+peptidos <- read_delim(file=file.path(params$folder.data,params$file1),
                        ";", escape_double = FALSE, trim_ws = TRUE ) 
 length(complete.cases(peptidos)) # comprobamos que el dataset está completo
 
@@ -198,7 +198,7 @@ ggseqlogo(peptidos$sequence, facet = "wrap")
 
 ```
 
-## Codificación "one-hot" (one-hot encoding) de las secuencias.
+## Codificación "one-hot" de las secuencias
 
 En este paso vamos a desarrollar una función en R que implemente la codificación "one-hot" (one-hot encoding) de las secuencias.
 
@@ -235,38 +235,39 @@ data <- convert(peptidos$sequence) # aplicamos la función creada
 v1 <- seq(1, 180, by = 1) # le damos un nombre a cada una de las 180 variables
 
 # Lo convertimos en data frame
-dataset <- as.data.frame(t(as.data.frame(strsplit(data, "", 
+data.pep <- as.data.frame(t(as.data.frame(strsplit(data, "", 
               perl = TRUE))), col.names = v1, row.names = FALSE)
-indx <- sapply(dataset, is.character)
-dataset[indx] <- lapply(dataset[indx], function(x) as.numeric(as.character(x))) 
+indx <- sapply(data.pep, is.character)
+data.pep[indx] <- lapply(data.pep[indx], function(x) as.numeric(as.character(x))) 
 
 ```
 
 Creamos y guardamos un archivo csv para poder utilizarlo posteriormente:
 
 ```{r eval=FALSE, include=TRUE}
-write.csv(dataset, "./dataset/peptidos_transf_one_hot1.csv", 
-          sep = ";", col.names = FALSE, row.names = FALSE)
+write.csv(data.pep, "./dataset/peptidos_transf_one_hot1.csv", 
+          sep = ",", col.names = FALSE, row.names = FALSE)
 ```
 
 
 ## Algoritmo Red Neuronal Artificial
 ### Paso 1. Leer los datos transformados
 
-Podemos emplear directamente el archivo creado en los pasos anteriores *dataset* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso, para no ir arrastrando errores en caso de que los haya:
+Podemos emplear directamente el archivo creado en los pasos anteriores *data.pep* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso.
 
 ```{r data, message=FALSE, warning=FALSE}
 library(readr)
 
-# Mis datos
-data.nn <- read_csv("dataset/peptidos_transf_one_hot1.csv")
+data.nn <- read_delim(file=file.path(params$folder.data,params$file2),
+                       ",", trim_ws = TRUE )
+length(complete.cases(data.nn)) # comprobamos que el dataset está completo
 
 # Para  tener un primer contacto con los datos, se presenta 
 # los seis primeros registros y las ultimas 5 variables, 
 # así como las dimensiones de la tabla que hemos importado: 
 
 dim(data.nn)
-head(dataset[,(ncol(dataset)-4):ncol(dataset)])
+head(data.nn[,(ncol(data.nn)-4):ncol(data.nn)])
 
 # Podemos comprobar si todas las observaciones están completas y no falta ningún valor.
 # colSums(is.na(dataRNA)) 
@@ -299,20 +300,13 @@ dim(data.nn.test)
 
 ```
 
-### Paso 3. Semilla aleatorio
-
-```{r seed}
-# set.seed(params$seed.clsfier) # para garantizar que
-                                # los resultados sean reproducibles
-```
-
-### Paso 4. Modelos de red neuronal artificial de una sola capa oculta con 1 y 3 nodos
+### Paso 3. Modelos de ANN de capa oculta con 1 y 3 nodos
 
 Para la construcción de la red neuronal artificial se usa la función `neuralnet()` del paquete *neuralnet*:
 
 La fórmula del modelo tiene `r ncol(data.nn)` nodos de entrada y `nlevels(peptidos$label)` nodos de salida:
 
-**con un nodo**
+**Con un nodo**
 
 ```{r formula, echo=FALSE,warning=FALSE,message=FALSE}
 
@@ -329,7 +323,7 @@ El modelo aplicado es de un nodo en la capa oculta, esto se consigue con el argu
 ```{r modelo1,warning=FALSE,message=FALSE,tidy=TRUE,fig.height=4  }
 
 # simple ANN con una única neurona en la capa oculta
-set.seed(params$seed.clsfier) # to guarantee repeatable results
+set.seed(params$seed.clsfier) # semilla que nos garantiza resultados reproducibles
 nn.model.1 <- neuralnet(fmla,
                           data = data.nn.train,
                           hidden=1, linear.output=FALSE)
@@ -385,7 +379,7 @@ plot(nn.model.3, rep='best')
 
 ```
 
-### Paso 5. Comentar los resultados
+### Paso 4. Comentar los resultados
 
 El resultado de la matriz de confusión con los datos de test en el último modelo con tres nodos sería:
 
@@ -406,12 +400,12 @@ El nuevo modelo con 3 nodos ocultos obtiene una precisión de `r round(cmatrix3$
 
 Al comparar los dos modelos vemos que obtenemos resultados muy similares, por lo que escogemos el modelo más sencillo, de forma que podamos equilibrar la complejidad y la precisión del modelo. Los modelos más complejos también son más susceptibles de tener overfitting.
 
-### Paso 6. Paquete caret modelo "mlp"
+### Paso 5. Modelo mlp con el paquete caret
 
-El paquete `caret` (abreviatura de Classification And REgression Training) contiene funciones para simplificar el proceso de entrenamiento de modelos para problemas complejos de regresión y clasificación. El paquete utiliza una cantidad de paquetes R [@kuhn2012caret] pero intenta no cargarlos todos al inicio del paquete (al eliminar las dependencias formales del paquete, el tiempo de inicio del paquete puede disminuir considerablemente).
+El paquete `caret` (abreviatura de Classification And REgression Training) contiene funciones para simplificar el proceso de entrenamiento de modelos para problemas complejos de regresión y clasificación. El paquete utiliza una cantidad de paquetes R [@kuhn2012caret] pero intenta no cargarlos todos al inicio (al eliminar las dependencias formales del paquete, el tiempo de inicio del mismo puede disminuir considerablemente).
 
-La función `nnet` admite datos de tipo factor, así que no es necesario transformar la variable `label` en variables binarias.
-Para el nuevo data.frame con la variable label incluida, creamos de nuevo los grupos de training (2/3) y test (1/3) con la funcion *createDataPartition*.
+La función `nnet` admite datos de tipo factor, así que no es necesario transformar la variable *label* en variables binarias.
+Para el nuevo data.frame con la variable *label* incluida, creamos de nuevo los grupos de training (2/3) y test (1/3) con la funcion `createDataPartition`.
 
 ```{r caret1,warning=FALSE,message=FALSE}
 
@@ -472,7 +466,7 @@ Como vemos, con un modelo *mlp* con 3 nodos se consigue un *accuracy* de validac
 La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empleando la otra función, no difiere mucho de los resultados obtenidos en este modelo. Es un modelo mucho más robusto que los anteriores, sin embargo, debido al tiempo de ejecución, quizá en este caso no es necesario ejecutarlo, ya que con los modelos anteriores tenemos una buena precisión.
 
 ## Algoritmo Support Vector Machine
-### Paso 1. Leer los datos transformados.
+### Paso 1. Leer los datos transformados
 
 Podemos emplear directamente el archivo creado en los pasos anteriores *dataset* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso, para no ir arrastrando errores en caso de que los haya:
 
@@ -515,31 +509,24 @@ head(dataset.train[,(ncol(dataset.train)-4):ncol(dataset.train)])
 
 El porcentaje de muestras tumorales en los datos de training es de `r round((table(dataset.train$y)[1]/ nrow(dataset.train))*100,2)`%, y en los de test de `r round((table(dataset.test$y)[1]/ nrow(dataset.test))*100,2)`%. Si el tamaño de la muestra es bajo, podríamos emplear otros métodos como k-fold cross validation o bootstrap.
 
-### Paso 3. Semilla generadora.
-
-Para garantizar que los resultados sean reproducibles, incluimos la siguiente semilla, como tenemos el valor de la semilla incluida en el encabezado `YAML` del documento, solo debemos llamarla con el siguiente script.
-
-```{r}
-set.seed(params$seed.clsfier) # to guarantee repeatable results
-```
-
-### Paso 4. Utilizar la función lineal y la RBF para ajustar un modelo de SVM
+### Paso 3. Función lineal y Gaussiana en el modelo SVM
 
 El algoritmo de SVM que podemos emplear es la función `ksvm()` del paquete *kernlab*. Aunque hay otras opciones, como la funcion svm() del paquete `e1071` identifica automáticamente si se trata de un problema de clasificación, la variable respuesta es de tipo factor, o de regresión, la variable respuesta es tipo numérico. 
 
-**Modelo linal**
+**Modelo lineal**
 
+Para garantizar que los resultados sean reproducibles, incluimos la siguiente semilla, como tenemos el valor de la semilla incluida en el encabezado `YAML` del documento, solo debemos llamarla con el siguiente script.
 Se construye el modelo más sencillo: lineal, usando como kernel el valor `vanilladot`
 
 ```{r SVMlineal, warning=FALSE, message=FALSE}
-# library(kernlab)
+set.seed(params$seed.clsfier) # garantiza resultados reproducibles
+
 # Para que la función svm() calcule el Support Vector Classifier,
 # se tiene que indicar que la función kernel es lineal.
 model.svm <- ksvm(label~.,data=dataset.train, kernel='vanilladot')
 
 # look at basic information about the model
 model.svm
-summary(model.svm)
 ```
 
 Se puede observar que la función lineal no tiene parámetros adicionales ('hiperparametros') al de coste.
@@ -583,15 +570,15 @@ res2 <- table(modelo.svm.rbf.pred, dataset.test$label)
 (cmatrix2 <- confusionMatrix(res2,positive="SB"))
 ```
 
-### Paso 5. Comentar los resultados
+### Paso 4. Comentar los resultados
 
 El nuevo modelo de SVM con kernel gaussiano obtiene una precisión de `r round(cmatrix2$overall["Accuracy"], 3)` y una sensitividad y especificidad de `r round(cmatrix2$byClass["Sensitivity"], 3)` y `r round(cmatrix2$byClass["Specificity"], 3)` respectivamente. `r if(cmatrix1$overall["Accuracy"] > cmatrix2$overall["Accuracy"]){"Vemos que el modelo obtenido con SVM lineal tiene una mayor precisión"}``r if(cmatrix1$overall["Accuracy"] < cmatrix2$overall["Accuracy"]){"Vemos que el modelo obtenido con SVM gaussiano tiene una mayor precisión"}``r if(cmatrix1$overall["Accuracy"] == cmatrix2$overall["Accuracy"]){"Vemos que ambos modelos tienen la misma precisión"}`
 
 Como vemos ambas tienen resultados muy similares, por lo que escogemos el modelo lineal que es mas sencillo. Debemos tratar de equilibrar la complejidad y la precisión del modelo, evitando el overfitting de los modelos complejos.
 
-### Paso 6. Paquete caret modelo svmRBF con 5-fold crossvalidation
+### Paso 5. Modelo svmRBF 5-fold crossvalidation con caret
 
-Emplamos los grupos de entrenamiento y test creados en el apartado anterior con la funcion *createDataPartition* para el paquete caret, ya que este paquete admite datos de tipo factor. 
+Usamos los grupos de entrenamiento y test creados en el apartado anterior con la funcion `createDataPartition` para el paquete `caret`, ya que este paquete admite datos de tipo factor. 
 
 ```{r caretsvm1,warning=FALSE,message=FALSE}
 
@@ -640,10 +627,10 @@ head(prediction.rbf.fold5.prob)
 Como vemos, con un modelo mlp con 3 nodos se consigue un accuracy de validación promedio del 99.8%.
 La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empleando la otra función, no difiere mucho de los resultados obtenidos en este modelo. Es un modelo mucho más robusto que los anteriores, sin embargo, debido al tiempo de ejecución, quizá en este caso no es necesario, ya que con los modelos anteriores tenemos una buena "accuracy".
 
-## Conclusiones
+## Discusión final
 
 En este tipo de escenario, en el que el número de predictores es varios órdenes de magnitud mayor que el de observaciones, los modelos son proclives a sufrir overfitting. Esto sugiere que, de entre los diferentes tipos de kernels, sea adecuado emplear el de menor flexibilidad, el kernel lineal. El único hiperparámetro de un SVM con kernel lineal es el valor de penalización C
 
-# References
+# Bibliografía
 
 </div>
