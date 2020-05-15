@@ -4,18 +4,18 @@ author: "María Plaza García"
 subtitle: '`r params$subtitulo`'
 date: '`r format(Sys.Date(),"%e de %B, %Y")`' 
 output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: true
+    theme: united
+    highlight: tango
   pdf_document:
     toc_depth: 2
     keep_tex: yes
     number_sections: yes
     toc: yes
     df_print: kable
-    highlight: tango
-  html_document:
-    df_print: paged
-    toc: yes
-    toc_float: true
-    theme: united
     highlight: tango
   word_document:
     toc: true
@@ -350,7 +350,7 @@ El resultado de la matriz de confusión con los datos de test en este modelo pod
 
 ```{r Mconfusion1,warning=FALSE,message=FALSE,tidy=TRUE}
 
-nn.model.1.matrix <- compute(nn.model.1, data.nn.test[,1:180])$net.result
+nn.model.1.matrix <- predict(nn.model.1, data.nn.test[,1:180])
 
 # Creamos una salida binaria múltiple a nuestra salida categórica
 max.idx <- function(xxy) {
@@ -390,7 +390,7 @@ plot(nn.model.3, rep='best')
 El resultado de la matriz de confusión con los datos de test en el último modelo con tres nodos sería:
 
 ```{r Mconfusion3,warning=FALSE,message=FALSE,tidy=TRUE}
-nn.model.3.matrix <- compute(nn.model.3, data.nn.test[,1:180])$net.result
+nn.model.3.matrix <- predict(nn.model.3, data.nn.test[,1:180])
 
 idx <- apply(nn.model.3.matrix, 1, max.idx)
 prediction <- c('SB', 'NB')[idx]
@@ -452,11 +452,10 @@ El siguiente ejemplo utiliza la validación cruzada 5 veces para estimar el meto
 model.fold5 <- train(label ~ ., train.set, method='mlp', 
                trControl= trainControl(method='cv', number=5), 
                tuneGrid= NULL, tuneLength=10 ,trace = FALSE, size=3)
-
+model.fold5
 # Lo graficamos y vemos los resultados
 plotnet(model.fold5, alpha=0.6)
 plot(model.fold5)
-summary(model.fold5)
 
 # empleamos el modelo para predecir y 
 # comparamos la predicción con los datos de test
@@ -469,8 +468,8 @@ head(prediction.fold5.prob)
 
 ```
 
-Como vemos, con un modelo mlp con 3 nodos se consigue un accuracy de validación promedio del 99.8%.
-La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empleando la otra función, no difiere mucho de los resultados obtenidos en este modelo. Es un modelo mucho más robusto que los anteriores, sin embargo, debido al tiempo de ejecución, quizá en este caso no es necesario, ya que con los modelos anteriores tenemos una buena "accuracy".
+Como vemos, con un modelo *mlp* con 3 nodos se consigue un *accuracy* de validación promedio del 99.8%.
+La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empleando la otra función, no difiere mucho de los resultados obtenidos en este modelo. Es un modelo mucho más robusto que los anteriores, sin embargo, debido al tiempo de ejecución, quizá en este caso no es necesario ejecutarlo, ya que con los modelos anteriores tenemos una buena precisión.
 
 ## Algoritmo Support Vector Machine
 ### Paso 1. Leer los datos transformados.
@@ -493,7 +492,7 @@ head(dataset[,(ncol(dataset)-4):ncol(dataset)])
 
 ### Paso 2. Partición de los datos en training/test
 
-Empleamos las variables binarias de base de datos transformada con la variable categorica "label" como ultima variable, al igual que hemos realizado para el modelo de red neuronales con el paquete caret.
+Empleamos las variables binarias de base de datos transformada con la variable categorica *label* como ultima variable, al igual que hemos realizado para el modelo de red neuronales con el paquete `caret`.
 
 ```{r}
 #Partición de datos
@@ -516,9 +515,9 @@ head(dataset.train[,(ncol(dataset.train)-4):ncol(dataset.train)])
 
 El porcentaje de muestras tumorales en los datos de training es de `r round((table(dataset.train$y)[1]/ nrow(dataset.train))*100,2)`%, y en los de test de `r round((table(dataset.test$y)[1]/ nrow(dataset.test))*100,2)`%. Si el tamaño de la muestra es bajo, podríamos emplear otros métodos como k-fold cross validation o bootstrap.
 
-### Paso 3. semilla generadora el valor 1234567.
+### Paso 3. Semilla generadora.
 
-Para garantizar que los resultados sean reproducibles, incluimos la siguiente semilla, como tenemos el valor de la semilla incluida en el encabezado `YAML` del documento, solo debemos llamarla con el siguiente script, que incluiremos más adelante además cuando creemos el modelo.
+Para garantizar que los resultados sean reproducibles, incluimos la siguiente semilla, como tenemos el valor de la semilla incluida en el encabezado `YAML` del documento, solo debemos llamarla con el siguiente script.
 
 ```{r}
 set.seed(params$seed.clsfier) # to guarantee repeatable results
@@ -550,7 +549,7 @@ En el siguiente paso empleamos los datos de test, datos nuevos, para ver como ge
 ```{r predic}
 model.svm.pred <- predict(model.svm, dataset.test)
 
-#Modelo lineal
+# Modelo lineal
 res <- table(model.svm.pred, dataset.test$label)
 (cmatrix <- confusionMatrix(res, positive="SB"))
 ```
@@ -594,7 +593,7 @@ Como vemos ambas tienen resultados muy similares, por lo que escogemos el modelo
 
 Emplamos los grupos de entrenamiento y test creados en el apartado anterior con la funcion *createDataPartition* para el paquete caret, ya que este paquete admite datos de tipo factor. 
 
-```{r caret1,warning=FALSE,message=FALSE}
+```{r caretsvm1,warning=FALSE,message=FALSE}
 
 #Partición de datos
 set.seed(params$seed.train)
@@ -615,9 +614,9 @@ dim(train.set)
 
 ```
 
-Empleamos ahora el paquete `caret` con el modelo `svmRB`F para aplicar el algoritmo de SVM con 5-fold crossvalidation.
+Empleamos ahora el paquete `caret` con el modelo `svmRBF` para aplicar el algoritmo de SVM con 5-fold crossvalidation.
 
-```{r caret2,warning=FALSE,message=FALSE,fig.height=4}
+```{r caretsvm2,warning=FALSE,message=FALSE,fig.height=4}
 # modelo 5-crossvalidation
 set.seed(params$seed.clsfier)
 model.rbf.fold5 <- train(label ~ ., train.set, method='svmRadial', 
@@ -643,7 +642,8 @@ La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empl
 
 ## Conclusiones
 
-# References
+En este tipo de escenario, en el que el número de predictores es varios órdenes de magnitud mayor que el de observaciones, los modelos son proclives a sufrir overfitting. Esto sugiere que, de entre los diferentes tipos de kernels, sea adecuado emplear el de menor flexibilidad, el kernel lineal. El único hiperparámetro de un SVM con kernel lineal es el valor de penalización C
 
+# References
 
 </div>
