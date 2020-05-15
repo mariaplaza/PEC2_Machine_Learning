@@ -1,0 +1,442 @@
+---
+title: 'PEC 2 Machine Learning'
+author: "María Plaza García"
+subtitle: '`r params$subtitulo`'
+date: '`r format(Sys.Date(),"%e de %B, %Y")`' 
+output:
+  pdf_document:
+    toc_depth: 2
+    keep_tex: yes
+    number_sections: yes
+    toc: yes
+    df_print: kable
+    highlight: tango
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: true
+    theme: united
+    highlight: tango
+  word_document:
+    toc: true
+link-citations: yes
+nocite: |
+  @lantz2015machine
+  @max2017caret
+header-includes:
+  - \usepackage[spanish]{babel}
+params:
+  file1: peptidos_transf_one_hot.csv
+  file2: peptidos.csv
+  folder.data: dataset
+  p.train: !r 2/3
+  subtitulo: Predicción de interacción entre péptido y el complejo mayor de histocompatibilidad tipo I con Artificial Neural Networks (ANN) y Support Vector Machines (SVM)
+  seed.train: 123
+  seed.clsfier: 1234567
+bibliography: pec2.bib
+geometry: margin=2cm
+---
+
+```{r setup, include=FALSE}
+require(knitr)
+knitr::opts_chunk$set(echo = TRUE, comment = NULL, cache=TRUE, fig.width = 7, fig.height = 7,
+                      message = FALSE, warning = FALSE)
+options(width=90)
+Sys.setlocale("LC_TIME", "C")
+```
+
+
+```{r packages, message=FALSE, echo=FALSE, warning=FALSE}
+libraries <- c("neuralnet", "NeuralNetTools", "ggplot2" ,"caret")
+check.libraries <- is.element(libraries, installed.packages()[, 1])==FALSE
+libraries.to.install <- libraries[check.libraries]
+if (length(libraries.to.install!=0)) {
+  install.packages(libraries.to.install)
+}
+
+success <- sapply(libraries,require, quietly = FALSE,  character.only = TRUE)
+if(length(success) != length(libraries)) {stop("A package failed to return a success in require() function.")}
+```
+
+\pagebreak
+
+<div class=text-justify>
+
+# Introducción
+
+En esta PEC vamos a resolver un análisis relacionado con la modelización de la interacción entre el complejo mayor de histocompatibilidad tipo I (MHCI, en inglés) y péptidos.
+
+En la inmunoterapia contra el cancer las células T deben activarse al exponerse a péptidos tumorales unidos a MHCI (pMHCI). Al analizar la genética del tumor, se pueden identificar péptidos relevantes y, dependiendo del tipo particular de MHCI que tiene el paciente, podemos predecir qué interacción péptido MHCI (pMHCI) es probable que esté presente en el tumor del paciente y, por lo tanto, qué pMHCI se deben usar para activar las células T.
+
+Los ficheros necesarios para realizar la PEC estan en formato csv con separador punto y coma. Se encuentran dentro de mi repositorio github, asi como cada uno de los archivos creados para la realización de esta PEC:
+
+https://github.com/mariaplaza/PEC2_Machine_Learning
+
+En cada registro del fichero peptidos.csv se tienen dos variables: 1) el péptido, 2) la clase de interacción donde NB significa no interacción y SB significa interacción positiva.
+
+En el caso que nos ocupa, análisis basados en secuencias, se usará la transformación denominada one-hot encoding. El one-hot encoding representa cada aminoácido por un vector de 20 componentes, con 19 de ellas a 0 y una a 1 indicando el aminoacido. Pongamos por ejemplo, el aminoácido A se representa por (1,0,. . . ,0) y el aminoácido R por (0,1,0, . . . , 0). Por tanto, para una secuencia de 9 aminoácidos, como en nuestro caso, se obtendrá un vector de 20*9 componentes, resultado de concatenar los vectores para cada uno de los 9 aminoácidos.
+
+Una vez realizada la transformación, one-hot encoding el objetivo es implementar un algoritmo de red neuronal artificial y de support vector machine para predecir si la secuencia peptídica interacciona o no con MHCI.
+
+# Algoritmo Red Neuronal Artificial
+
+Una red neuronal, según Freman y Skapura, es un sistema de procesadores paralelos conectados entre sí en forma de grafo dirigido. Esquemáticamente cada elemento de procesamiento (neuronas) de la red se representa como un nodo, que recibe y envia señales (información). Se crea entonces una red con diferentes capas interconectadas para procesar la información. Cada capa esta formada por un grupo de nodos que transmite la información a los otros nodos de las capas siguientes. Estas conexiones establecen una estructura jerárquica que tratando de emular la fisiología del cerebro busca nuevos modelos de procesamiento para solucionar problemas concretos del mundo real. Lo importante en el desarrollo de la técnica de las RNA es su útil comportamiento al aprender, reconocer y aplicar relaciones entre objetos y tramas de objetos propios del mundo real. Es por tanto, una nueva forma de computación o modelo matemático inspirado en modelos biológicos y compuesto por un gran número de elementos procesales organizados en niveles.
+
+Debido a que presentan un gran número de características similares a las del cerebro humano, las redes neuronales son capaces de aprender de la experiencia, de abstraer características esenciales a partir de entradas que presentan información irrelevante, de generalizar de casos anteriores a nuevos casos…etc. Todo esto permite su aplicación en un gran número de areas muy diferenciadas:
+
+- Aproximación de funciones, o el análisis de regresión, incluyendo la predicción de series temporales, funciónes de aptitud y el modelado.
+- Clasificación, incluyendo el reconocimiento de patrones y la secuencia de reconocimiento, detección y de la toma de decisiones secuenciales (diagnostico m'edico, aplicaciones financieras, sistemas radar, reconocimiento facial, clasificación de señales, control del vehículo, predicción de trayectorias, el control de procesos, manejo de recursos naturales, juegos y la toma de decisiones como el backgammon, ajedrez, póquer...)
+- Procesamiento de datos, incluyendo el filtrado, el agrupamiento, la separación ciega de las señales y compresión (diferenciando entre informes deseados y no deseados en redes sociales y prevención de spam)
+- Robótica, incluyendo la dirección de manipuladores y prótesis.
+- Ingeniería de control, incluyendo control numérico por computadora.
+
+Las fortalezas y debilidades de este algoritmo son:
+
+| **Fortalezas**    | **Debilidades**  | 
+| ----------------------------------- |:-----------------------------------|
+|- Adaptable a clasificación o problemas de predicción numérica |- Requiere de gran potencia computacional |
+| - Capaz de modelar patrones más complejos que casi cualquier otro algoritmo | - Propenso a sobreajustar los datos de entrenamiento |
+| - No necesita muchas restricciones acerca de las relaciones subyacentes de los datos | - Es un modelo de caja negra complejo que es dificil, si no imposible, de interpretar
+| - Aprendizaje Adaptativo: Capacidad de aprender a realizar tareas basadas en un entrenamiento o en una experiencia inicial | - Complejidad de aprendizaje para grandes tareas, cuanto más cosas se necesiten que aprenda una red, mas complicado será enseñarle  |
+| - Auto-organización: Una red neuronal puede crear su propia organización o representación de la información que recibe mediante una etapa de aprendizaje | -  Tiempo de aprendizaje elevado. Esto depende de dos factores: primero si se incrementa la cantidad de patrones a identificar o clasificar y segundo si se requiere mayor flexibilidad o capacidad de adaptación de la red neuronal para reconocer patrones que sean sumamente parecidos  |
+| -Tolerancia a fallos: La destrucción parcial de una red conduce a una degradación de su estructura; sin embargo, algunas capacidades de la red se pueden retener, incluso sufriendo un gran daño |- Elevada cantidad de datos para el entrenamiento, cuanto mas flexible se requiera que sea la red neuronal, mas información tendrá que enseñarle para que realice de forma adecuada la identificación  |
+| -Operación en tiempo real: Los cómputos neuronales pueden ser realizados en paralelo; para esto se diseñan y fabrican máquinas con hardware especial para obtener esta capacidad | -  Falta de reglas definitorias que ayuden a realizar una red para un problema dado  |
+| -Fácil inserción dentro de la tecnología existente: Se pueden obtener chips especializados para redes neuronales que mejoran su capacidad en ciertas tareas. Ello facilitará la integración modular en los sistemas existentes | - Requieren la definición de muchos parámetros antes de poder aplicar la metodología   |
+
+# Algoritmo Support Vector Machine
+
+El método de clasificación-regresión Máquinas de Vector Soporte (Vector Support Machines, SVMs) es un algoritmo de aprendizaje supervisado que fue desarrollado en la década de los 90 dentro de campo de la ciencia computacional. Si bien originariamente se desarrolló como un método de clasificación binaria, su aplicación se ha extendido a problemas de clasificación múltiple y regresión. SVMs ha resultado ser uno de los mejores clasificadores para un amplio abanico de situaciones, por lo que se considera uno de los referentes dentro del ámbito de aprendizaje estadístico y machine learning.
+
+Las máquinas de vectores de soporte pertenecen a una clase de algoritmos de aprendizaje automático llamados métodos de kernel y también se conocen como máquinas de kernel. Se fundamentan en el Maximal Margin Classifier, que a su vez, se basa en el concepto de hiperplano óptimo como una superficie de decisión de tal manera que se maximiza el margen de separación entre las dos clases en los datos. Los vectores de soporte se refieren a un pequeño subconjunto de las observaciones de entrenamiento que se utilizan como soporte para la ubicación óptima de la superficie de decisión.
+
+Cuando los datos no son separables de forma lineal, es necesario el uso de kernels, o funciones de similitud y especificar un parámetro determinado para minimizar la función de coste. La elección de este parámetro es en base ensayo/error, pero se buscan valores que no sean extremos en la búsqueda del equilibrio sesgo/varianza. Los kernels más populares son el lineal y el gausiano, aunque hay otros como el polinomial, string kernel o chi-square kernel.
+
+En R, las librerías e1071 y LiblineaR contienen los algoritmos necesarios para obtener modelos de clasificación simple, múltiple y regresión, basados en Support Vector Machines.
+
+Algunos casos de éxito de las máquinas de vectores de soporte son:
+
+- reconocimiento óptico de caracteres
+- detección de caras para que las cámaras digitales enfoquen correctamente
+- filtros de spam para correo electrónico
+- clasificar genes diferencialmente expresados a partir de datos de microarrays
+- reconocimiento de imágenes a bordo de satélites (saber qué partes de una imagen tienen nubes, tierra, agua, hielo, etc.)
+- procesamiento de lenguaje natural, reconocimiento de voz e imagen y visión por computadora
+- clasificación de texto en distintas categorías temáticas
+- detección de eventos críticos de escasa frecuencia, como terremotos
+
+La capacitación para una SVM tiene dos fases:
+
+1. Transformar los predictores (datos de entrada) a un espacio de características de alta dimensión.
+2. Resuelver un problema de optimización cuadrática para ajustar un hiperplano óptimo y clasificar las características transformadas en dos clases. El número de características transformadas está determinado por el número de vectores de soporte. Solo los vectores de soporte elegidos de los datos de entrenamiento son necesarios para construir la superficie de decisión. Una vez entrenado, el resto de los datos de entrenamiento son irrelevantes.
+
+Las fortalezas y debilidades de este algoritmo son:
+
+**Fortalezas** | **Debilidades**
+------------------------------ | ------------------------------
+- Uso en predicción y clasificación. Uso bastante extendido |- Requiere especificar parámetro C y función de kernel (prueba y error)
+- Funciona de forma óptima con ruido |- Lento de entrenar, sobre todo a medida que aumenta el número de características
+- Facilidad de uso en comparación de las redes neuronales |-Al igual que las redes neuronales es difícil de interpretar el funcionamiento interno.
+- Eficaz en espacios de grandes dimensiones | - No proporcionan directamente estimaciones de probabilidad, éstas se calculan utilizando una validación cruzada quíntuple.
+- Todavía eficaz en casos donde el número de dimensiones es mayor que el número de muestras | - Complejidad temporal del algoritmo
+- Utiliza un subconjunto de puntos de entrenamiento en la función de decisión (llamada vectores de soporte), por lo que también es eficiente en memoria | 
+- Versátil: se pueden especificar diferentes funciones del núcleo para la función de decisión. |    
+
+# Trabajando con los datos
+
+## Descripción y análisis preliminar de los datos
+
+Hemos incluido varios parámetros en el encabezado YAML del documento cuyos valores se pueden establecer cuando se procesa el informe. Se ha incluido tanto la semilla que emplearemos más tarde en la creación de los datos de test y de entrenamiento así como los nombres de los archivos y la ruta de acceso, de esta forma podemos leer los datos con el siguiente código:
+
+```{r datos,message=FALSE,warning=FALSE}
+# Ahora ya se importan los datos a formato data.frame
+library(readr)
+peptidos <- read_delim(file=file.path(params$folder.data,params$file2),";", escape_double = FALSE, trim_ws = TRUE ) 
+length(complete.cases(peptidos)) # comprobamos que el dataset está completo
+
+```
+
+Si no disponemos de esta posibilidad, se puede crear un chunk donde se realice la asignación de estas variables
+
+```{r datos1, eval=FALSE, include=TRUE}
+# peptidos <- read_delim("dataset/peptidos.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+# length(complete.cases(peptidos))
+
+```
+
+Empezamos echando un breve vistazo a los datos descargados y así tener una idea clara las características de los datos con los que estamos trabajando.
+
+```{r}
+str(peptidos)
+```
+
+Nuestro dataframe está compuesto por 15840 observaciones de 2 variables representando la primera de ellas la secuencia del peptido y la segunda el factor que nos indica si la secuencia peptídica interacciona o no con MHCI.
+
+Para representar estos datos, podemos emplear su secuencia logo (https://en.wikipedia.org/wiki/Sequence_logo) con la ayuda del paquete *ggseqlogo*. Un logotipo de secuencia consiste en una pila de letras en cada posición. Los tamaños relativos de las letras indican su frecuencia en las secuencias. La altura total de las letras representa el contenido de la información de la posición, en bits.
+
+```{r secuencialogo}
+# Plot a single DNA sequence logo
+library(ggseqlogo)
+pepseq<- as.vector(peptidos$sequence)
+ggseqlogo(pepseq,seq_type='auto', namespace = 'NULL', font='helvetica_regular', col_scheme = 'nucleotide')
+ggseqlogo(peptidos$sequence, facet = "wrap")
+
+```
+
+## Codificación "one-hot" (one-hot encoding) de las secuencias.
+
+En este paso vamos a desarrollar una función en R que implemente la codificación "one-hot" (one-hot encoding) de las secuencias.
+
+```{r one-hot}
+
+convert <- function(l) { 
+ code1 <- c("10000000000000000000", "01000000000000000000", "00100000000000000000", "00010000000000000000", "00001000000000000000", "00000100000000000000", "00000010000000000000", "00000001000000000000", "00000000100000000000", "00000000010000000000", "00000000001000000000", "00000000000100000000", "00000000000010000000", "00000000000001000000", "00000000000000100000", "00000000000000010000", "00000000000000001000", "00000000000000000100", "00000000000000000010", "00000000000000000001")
+ names(code1) <- c("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V")
+     sapply(strsplit(l, "", perl = TRUE), 
+     function(x) paste(code1[x], collapse = "")) 
+} 
+
+```
+
+## Secuencias de aminoácidos en vectores numéricos
+
+Empleando la función creada en el apartado anterior, transformamos las secuencias de aminoácidos en vectores numéricos y estos en un data frame que podamos emplear en los siguientes pasos, al que denominamos *dataset*.
+
+```{r message=FALSE, warning=FALSE}
+
+variable <- peptidos$sequence
+data <- convert(variable)
+v1 <- seq(1, 180, by = 1)
+
+# como data frame
+dataset <- as.data.frame(t(as.data.frame(strsplit(data, "", perl = TRUE))), col.names = v1, row.names = FALSE)
+indx <- sapply(dataset, is.character)
+dataset[indx] <- lapply(dataset[indx], function(x) as.numeric(as.character(x))) 
+# View(dataset)
+
+# Cremos y guardamos un archivo csv para poder utilizarlo posteriormente:
+write.csv(dataset, "./dataset/peptidos_transf_one_hot1.csv", sep = ";", col.names = FALSE, row.names = FALSE)
+
+```
+
+## Algoritmo Red Neuronal Artificial
+### Paso 1. Leer los datos transformados
+
+Podemos emplear directamente el archivo creado en los pasos anteriores *dataset* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso, para no ir arrastrando errores en caso de que las haya:
+
+```{r message=FALSE, warning=FALSE}
+library(readr)
+
+# Mis datos
+data.nn <- read_csv("dataset/peptidos_transf_one_hot1.csv")
+dim(data.nn)
+
+# comprobar si todas las observaciones están completas y no falta ningún valor.
+# colSums(is.na(dataRNA)) 
+```
+
+### Paso 2. Partición de los datos en training/test
+
+En primer lugar, creamos las variables binarias en lugar de usar la variable factor
+
+```{r}
+n <- nrow(data.nn)
+
+# Creación de variables binarias en lugar de usar la variable factor
+data.nn$SB <- peptidos$label=="SB"
+data.nn$NB <- peptidos$label=="NB"
+```
+
+Se realiza una extracción de los datos *aleatoriamente* de `r round(params$p.train *100,2)`% de todas las observaciones, `r floor(params$p.train*n)`, para entrenar al modelo y del resto `r (n - floor(params$p.train*n))` para evaluarlo (test).
+
+```{r grupos}
+# create training and test data
+set.seed(params$seed.train)
+#n_train <- 2/3
+n <- nrow(data.nn)
+train <- sample(n,floor(n*params$p.train))
+data.nn.train <- data.nn[train,]
+data.nn.test  <- data.nn[-train,]
+
+dim(data.nn.train)
+dim(data.nn.test)
+
+```
+
+### Paso 3. Semilla aleatorio
+
+```{r}
+# set.seed(params$seed.clsfier) # to guarantee repeatable results
+```
+
+### Paso 4. Modelos de red neuronal artificial de una sola capa oculta con 1 y 3 nodos
+
+Para la construcción de la red neuronal artificial se usa la función `neuralnet()` del paquete *neuralnet*:
+
+La fórmula del modelo tiene `r ncol(data.nn)` nodos de entrada y `nlevels(peptidos$label)` nodos de salida:
+
+**con un nodo**
+
+```{r formula, echo=FALSE,warning=FALSE,message=FALSE}
+#require(neuralnet)
+
+## Create a formula for a model with a large number of variables:
+xnam <- names(data.nn[1:180])
+(fmla <- as.formula(paste("SB+NB ~ ", paste(xnam, collapse= "+"))))
+
+```
+
+El modelo aplicado es de un nodo en la capa intermedia, esto se consigue con el argumento `hidden=1`. El modelo se construye con el argumento `linear.output=FALSE` ya que se trata de un problema de clasificación.
+
+```{r modelo1,warning=FALSE,message=FALSE,tidy=TRUE,fig.height=4  }
+
+# simple ANN with only a single hidden neuron
+set.seed(params$seed.clsfier) # to guarantee repeatable results
+nn.model.1 <- neuralnet(fmla,
+                          data = data.nn.train,
+                          hidden=1, linear.output=FALSE)
+
+# visualize the network topology
+plot(nn.model.1, rep='best')
+
+```
+
+Podríamos también representar el mismo modelo usando el paquete *NeuralNetTools* con el siguiente código.
+
+```{r ,warning=FALSE,message=FALSE,tidy=TRUE}
+library(NeuralNetTools)
+
+# plotnet(nn.model.1,  prune_col = 'lightblue')
+```
+
+El resultado de la matriz de confusión con los datos de test en este modelo con un solo nodo la optenemos:
+
+```{r Mconfusion1,warning=FALSE,message=FALSE,tidy=TRUE}
+nn.model.1.matrix <- compute(nn.model.1, data.nn.test[,1:180])$net.result
+
+# Put multiple binary output to categorical output
+max.idx <- function(xxy) {
+  return(which(xxy == max(xxy)))
+}
+
+idx1 <- apply(nn.model.1.matrix, 1, max.idx)
+prediction1 <- c('SB', 'NB')[idx1]
+res1 <- table(prediction1, peptidos$label[-train] )
+
+# Results
+#require(caret)
+library(e1071)
+(cmatrix1 <- confusionMatrix(res1,positive="SB"))
+
+```
+
+**con tres nodos**
+
+El primer modelo fue con *un nodo* en la capa oculta. Ahora se plantea *3 nodos* en la capa oculta para tratar de mejorar el rendimiento.
+
+```{r modelo2,warning=FALSE,message=FALSE,tidy=TRUE,fig.height=4  }
+
+# simple ANN with only a single hidden neuron
+set.seed(params$seed.clsfier) # to guarantee repeatable results
+nn.model.3 <- neuralnet(fmla,
+                          data = data.nn.train,
+                          hidden=3,linear.output=FALSE)
+
+# visualize the network topology
+plot(nn.model.3, rep='best')
+
+```
+
+### Paso 5. Comentar los resultados
+
+El resultado de la matriz de confusión con los datos de test es:
+
+```{r Mconfusion3,warning=FALSE,message=FALSE,tidy=TRUE}
+nn.model.3.matrix <- compute(nn.model.3, data.nn.test[,1:180])$net.result
+
+idx <- apply(nn.model.3.matrix, 1, max.idx)
+prediction <- c('SB', 'NB')[idx]
+res <- table(prediction, peptidos$label[-train] )
+
+# Results
+#require(caret)
+library(e1071)
+(cmatrix3 <- confusionMatrix(res,positive="SB"))
+```
+
+El nuevo modelo con 3 nodos ocultos obtiene una precisión de `r round(cmatrix3$overall["Accuracy"], 3)` y una sensitividad y especificidad de `r round(cmatrix3$byClass["Sensitivity"], 3)` y `r round(cmatrix3$byClass["Specificity"], 3)` respectivamente. `r if(cmatrix1$overall["Accuracy"] > cmatrix3$overall["Accuracy"]){"Vemos que el modelo obtenido con un solo nodo tiene una mayor precisi?n"}``r if(cmatrix1$overall["Accuracy"] < cmatrix3$overall["Accuracy"]){"Vemos que el modelo obtenido con tres nodo tiene una mayor precision"}``r if(cmatrix1$overall["Accuracy"] == cmatrix3$overall["Accuracy"]){"Vemos que ambos modelos tienen la misma precision"}`
+
+Al comparar los dos modelos vemos que obtenemos resultados muy similares, por lo que escogemos el modelo más sencillo, de forma que podamos equilibrar la complejidad y la precisión del modelo. Los modelos más complejos también son más susceptibles de tener overfitting.
+
+### Paso 6. Paquete caret modelo "mlp"
+
+## Algoritmo Support Vector Machine
+### Paso 1. Leer los datos transformados.
+
+Podemos emplear directamente el archivo creado en los pasos anteriores *dataset* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso, para no ir arrastrando errores en caso de que las haya:
+
+```{r message=FALSE, warning=FALSE}
+library(readr)
+
+# Mis datos
+data.nn <- read_csv("dataset/peptidos_transf_one_hot1.csv")
+dim(data.nn)
+
+# comprobar si todas las observaciones están completas y no falta ningún valor.
+# colSums(is.na(dataRNA)) 
+```
+
+### Paso 2. Utilizando la semilla aleatoria 123, separar los datos en dos partes
+
+En primer lugar, creamos las variables binarias en lugar de usar la variable factor
+
+```{r}
+n <- nrow(data.nn)
+
+# Creación de variables binarias en lugar de usar la variable factor
+data.nn$SB <- peptidos$label=="SB"
+data.nn$NB <- peptidos$label=="NB"
+```
+
+Se realiza una extracción de los datos *aleatoriamente* de `r round(params$p.train *100,2)`% de todas las observaciones, `r floor(params$p.train*n)`, para entrenar al modelo y del resto `r (n - floor(params$p.train*n))` para evaluarlo (test).
+
+```{r grupos}
+# create training and test data
+set.seed(params$seed.train)
+#n_train <- 2/3
+n <- nrow(data.nn)
+train <- sample(n,floor(n*params$p.train))
+data.nn.train <- data.nn[train,]
+data.nn.test  <- data.nn[-train,]
+
+dim(data.nn.train)
+dim(data.nn.test)
+
+```
+
+### Paso 3. semilla generadora el valor 1234567.
+
+```{r}
+# set.seed(params$seed.clsfier) # to guarantee repeatable results
+```
+
+### Paso 4. Utilizar la función lineal y la RBF para ajustar un modelo de SVM
+
+
+
+### Paso 5. Comentar los resultados
+
+### Paso 6. Paquete caret modelo svmRBF
+
+## Conclusiones
+
+
+
+
+
+
+
+# References
+
+Freeman, J.A.; Skapura, DM. Redes Neuronales. Algoritmos, aplicaciones y técnicas de propagación. México: Addison-Wesley. 1993; 306 p
+
+</div>
