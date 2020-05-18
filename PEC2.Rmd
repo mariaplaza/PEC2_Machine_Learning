@@ -8,6 +8,7 @@ output:
     df_print: kable
     highlight: tango
     keep_tex: yes
+    latex_engine: xelatex
     number_sections: yes
     toc: yes
     toc_depth: 2
@@ -427,7 +428,7 @@ library(e1071)
 
 El nuevo modelo con 3 nodos ocultos obtiene una precisión de `r round(cmatrix3$overall["Accuracy"], 3)` y una sensitividad y especificidad de `r round(cmatrix3$byClass["Sensitivity"], 3)` y `r round(cmatrix3$byClass["Specificity"], 3)` respectivamente. `r if(cmatrix1$overall["Accuracy"] > cmatrix3$overall["Accuracy"]){"Vemos que el modelo obtenido con un solo nodo tiene una mayor precisión"}``r if(cmatrix1$overall["Accuracy"] < cmatrix3$overall["Accuracy"]){"Vemos que el modelo obtenido con tres nodo tiene una mayor precision"}``r if(cmatrix1$overall["Accuracy"] == cmatrix3$overall["Accuracy"]){"Vemos que ambos modelos tienen la misma precision"}`
 
-Además, el modelo con mayor precisión también es el modelo más sencillo. Los modelos más complejos también son más susceptibles de tener overfitting.
+El modelo con mayor precisión es el modelo más sencillo. Los modelos más complejos también son más susceptibles de tener overfitting.
 
 ### Paso 5. Modelo mlp con el paquete caret
 
