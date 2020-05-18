@@ -4,18 +4,18 @@ author: "María Plaza García"
 subtitle: '`r params$subtitulo`'
 date: '`r format(Sys.Date(),"%e de %B, %Y")`' 
 output:
+  pdf_document: 
+    df_print: kable
+    highlight: tango
+    keep_tex: yes
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
   html_document:
     df_print: paged
     toc: yes
     toc_float: true
     theme: united
-    highlight: tango
-  pdf_document:
-    toc_depth: 2
-    keep_tex: yes
-    number_sections: yes
-    toc: yes
-    df_print: kable
     highlight: tango
   word_document:
     toc: true
@@ -24,6 +24,7 @@ nocite: |
   @lantz2015machine
   @max2017caret
   @core2013r
+  @sanchez2015maquinas
 header-includes:
   - \usepackage[spanish]{babel}
 params:
@@ -49,7 +50,7 @@ Sys.setlocale("LC_TIME", "C")
 
 ```{r packages, message=FALSE, echo=FALSE, warning=FALSE}
 libraries <- c("neuralnet", "NeuralNetTools", "ggplot2" ,"caret", "kernlab",
-               "dplyr", "pROC", "knitr")
+               "dplyr", "pROC", "knitr", "ggseqlogo")
 check.libraries <- is.element(libraries, installed.packages()[, 1])==FALSE
 libraries.to.install <- libraries[check.libraries]
 if (length(libraries.to.install!=0)) {
@@ -67,7 +68,7 @@ if(length(success) != length(libraries)) {stop("A package failed to return
 
 # Introducción
 
-En esta PEC vamos a resolver un análisis relacionado con la modelización de la interacción entre el complejo mayor de histocompatibilidad tipo I (MHCI, en inglés) y péptidos.
+En esta PEC vamos a resolver un análisis relacionado con la modelización de la interacción entre el complejo mayor de histocompatibilidad tipo I (MHCI, en inglés) y péptidos. Para ello implementaremos dos modelos, un algoritmo de red neuronal artificial (ANN) y un algoritmo Support Vector Machine (SVM).
 
 En la inmunoterapia contra el cancer las células T deben activarse al exponerse a péptidos tumorales unidos a MHCI (pMHCI). Al analizar la genética del tumor, se pueden identificar péptidos relevantes y, dependiendo del tipo particular de MHCI que tiene el paciente, podemos predecir qué interacción péptido MHCI (pMHCI) es probable que esté presente en el tumor del paciente y, por lo tanto, qué pMHCI se deben usar para activar las células T.
 
@@ -83,13 +84,19 @@ Una vez realizada la transformación, one-hot encoding el objetivo es implementa
 
 # Algoritmo Red Neuronal Artificial
 
-Una red neuronal, según @freeman1993algoritmos, es un sistema de procesadores paralelos conectados entre sí en forma de grafo dirigido. Esquemáticamente cada elemento de procesamiento (neuronas) de la red se representa como un nodo, que recibe y envia señales (información). Se crea entonces una red con diferentes capas interconectadas para procesar la información. Cada capa esta formada por un grupo de nodos que transmite la información a los otros nodos de las capas siguientes. Estas conexiones establecen una estructura jerárquica que tratando de emular la fisiología del cerebro busca nuevos modelos de procesamiento para solucionar problemas concretos del mundo real. Lo importante en el desarrollo de la técnica de las RNA es su útil comportamiento al aprender, reconocer y aplicar relaciones entre objetos y tramas de objetos propios del mundo real. Es por tanto, una nueva forma de computación o modelo matemático inspirado en modelos biológicos y compuesto por un gran número de elementos procesales organizados en niveles.
+Una red neuronal, según @freeman1993algoritmos, es un sistema de procesadores paralelos conectados entre sí en forma de grafo dirigido. Esquemáticamente cada elemento de procesamiento (neuronas) de la red se representa como un nodo, que recibe y envia señales (información). Se crea entonces una red con diferentes capas interconectadas para procesar la información. Cada capa esta formada por un grupo de nodos que transmite la información a los otros nodos de las capas siguientes. Estas conexiones establecen una estructura jerárquica que tratando de emular la fisiología del cerebro busca nuevos modelos de procesamiento para solucionar problemas concretos del mundo real. Lo importante en el desarrollo de la técnica de las ANN es su útil comportamiento al aprender, reconocer y aplicar relaciones entre objetos y tramas de objetos propios del mundo real. Es por tanto, una nueva forma de computación o modelo matemático inspirado en modelos biológicos y compuesto por un gran número de elementos procesales organizados en niveles.
+
+\begin{figure}[h]
+\includegraphics[width=7cm]{./imagenes/ann.jpg}
+\caption {Modelo general de red de neurona ariticial. Fuente: Sanchez(2015)}
+\centering
+\end{figure}
 
 Debido a que presentan un gran número de características similares a las del cerebro humano, las redes neuronales son capaces de aprender de la experiencia, de abstraer características esenciales a partir de entradas que presentan información irrelevante, de generalizar de casos anteriores a nuevos casos…etc. Todo esto permite su aplicación en un gran número de areas muy diferenciadas [@lantz2015machine]:
 
-- Aproximación de funciones, o el análisis de regresión, incluyendo la predicción de series temporales, funciónes de aptitud y el modelado.
-- Clasificación, incluyendo el reconocimiento de patrones y la secuencia de reconocimiento, detección y de la toma de decisiones secuenciales (diagnostico m'edico, aplicaciones financieras, sistemas radar, reconocimiento facial, clasificación de señales, control del vehículo, predicción de trayectorias, el control de procesos, manejo de recursos naturales, juegos y la toma de decisiones como el backgammon, ajedrez, póquer...)
-- Procesamiento de datos, incluyendo el filtrado, el agrupamiento, la separación ciega de las señales y compresión (diferenciando entre informes deseados y no deseados en redes sociales y prevención de spam)
+- Aproximación de funciones, o el análisis de regresión, incluyendo la predicción de series temporales, funciones de aptitud y modelado.
+- Clasificación, incluyendo el reconocimiento de patrones y la secuencia de reconocimiento, detección y la toma de decisiones secuenciales (diagnostico médico, aplicaciones financieras, sistemas radar, reconocimiento facial, clasificación de señales, control del vehículo, predicción de trayectorias, el control de procesos, manejo de recursos naturales, juegos y la toma de decisiones como el backgammon, ajedrez, póquer...)
+- Procesamiento de datos, incluyendo el filtrado, el agrupamiento, la separación ciega de las señales y compresión (diferenciando, por ejemplo, entre informes deseados y no deseados en redes sociales y prevención de spam)
 - Robótica, incluyendo la dirección de manipuladores y prótesis.
 - Ingeniería de control, incluyendo control numérico por computadora.
 
@@ -99,7 +106,7 @@ Las fortalezas y debilidades de este algoritmo son:
 | ----------------------------------- |:-----------------------------------|
 |- Adaptable a clasificación o problemas de predicción numérica |- Requiere de gran potencia computacional |
 | - Capaz de modelar patrones más complejos que casi cualquier otro algoritmo | - Propenso a sobreajustar los datos de entrenamiento |
-| - No necesita muchas restricciones acerca de las relaciones subyacentes de los datos | - Es un modelo de caja negra complejo que es dificil, si no imposible, de interpretar
+| - No necesita muchas restricciones acerca de las relaciones subyacentes de los datos | - Es un modelo de caja negra complejo que es difícil, si no imposible, de interpretar
 | - Aprendizaje Adaptativo: Capacidad de aprender a realizar tareas basadas en un entrenamiento o en una experiencia inicial | - Complejidad de aprendizaje para grandes tareas, cuanto más cosas se necesiten que aprenda una red, mas complicado será enseñarle  |
 | - Auto-organización: Una red neuronal puede crear su propia organización o representación de la información que recibe mediante una etapa de aprendizaje | -  Tiempo de aprendizaje elevado. Esto depende de dos factores: primero si se incrementa la cantidad de patrones a identificar o clasificar y segundo si se requiere mayor flexibilidad o capacidad de adaptación de la red neuronal para reconocer patrones que sean sumamente parecidos  |
 | -Tolerancia a fallos: La destrucción parcial de una red conduce a una degradación de su estructura; sin embargo, algunas capacidades de la red se pueden retener, incluso sufriendo un gran daño |- Elevada cantidad de datos para el entrenamiento, cuanto mas flexible se requiera que sea la red neuronal, mas información tendrá que enseñarle para que realice de forma adecuada la identificación  |
@@ -108,11 +115,17 @@ Las fortalezas y debilidades de este algoritmo son:
 
 # Algoritmo Support Vector Machine
 
-El método de clasificación-regresión Máquinas de Vector Soporte (Vector Support Machines, SVMs) es un algoritmo de aprendizaje supervisado que fue desarrollado en la década de los 90 dentro de campo de la ciencia computacional. Si bien originariamente se desarrolló como un método de clasificación binaria, su aplicación se ha extendido a problemas de clasificación múltiple y regresión. SVMs ha resultado ser uno de los mejores clasificadores para un amplio abanico de situaciones, por lo que se considera uno de los referentes dentro del ámbito de aprendizaje estadístico y machine learning [@suarez2014tutorial].
+El método de clasificación-regresión denominado Máquinas de Vector Soporte (Vector Support Machines, SVMs) es un algoritmo de aprendizaje supervisado que fue desarrollado en la década de los 90 dentro de campo de la ciencia computacional. Si bien originariamente se desarrolló como un método de clasificación binaria, su aplicación se ha extendido a problemas de clasificación múltiple y regresión. SVMs ha resultado ser uno de los mejores clasificadores para un amplio abanico de situaciones, por lo que se considera uno de los referentes dentro del ámbito de aprendizaje estadístico y machine learning [@suarez2014tutorial].
 
 Las máquinas de vectores de soporte pertenecen a una clase de algoritmos de aprendizaje automático llamados métodos de kernel y también se conocen como máquinas de kernel. Se fundamentan en el Maximal Margin Classifier, que a su vez, se basa en el concepto de hiperplano óptimo como una superficie de decisión de tal manera que se maximiza el margen de separación entre las dos clases en los datos [@lantz2015machine]. Los vectores de soporte se refieren a un pequeño subconjunto de las observaciones de entrenamiento que se utilizan como soporte para la ubicación óptima de la superficie de decisión.
 
 Cuando los datos no son separables de forma lineal, es necesario el uso de kernels, o funciones de similitud y especificar un parámetro determinado para minimizar la función de coste. La elección de este parámetro es en base ensayo/error, pero se buscan valores que no sean extremos en la búsqueda del equilibrio sesgo/varianza. Los kernels más populares son el lineal y el gausiano, aunque hay otros como el polinomial, string kernel o chi-square kernel.
+
+\begin{figure}[h]
+\includegraphics[width=7cm]{./imagenes/svm.jpg}
+\caption{Modelo general de Vector Support Machines. Fuente: Sanchez(2015)}
+\centering
+\end{figure}
 
 En R, las librerías `e1071` y `LiblineaR` contienen los algoritmos necesarios para obtener modelos de clasificación simple, múltiple y regresión, basados en Support Vector Machines.
 
@@ -147,11 +160,12 @@ Las fortalezas y debilidades de este algoritmo son:
 # Trabajando con los datos
 ## Descripción y análisis preliminar de los datos
 
-Hemos incluido varios parámetros en el encabezado `YAML` del documento cuyos valores se pueden establecer cuando se procesa el informe. Se ha incluido tanto la semilla que emplearemos más tarde en la creación de los datos de test y de entrenamiento así como los nombres de los archivos y la ruta de acceso, de esta forma podemos leer los datos con el siguiente código:
+Para facilitar la reproducibilidad del informe, se han incluido varios parámetros en el encabezado `YAML` del documento cuyos valores se pueden establecer cuando se procesa el informe. Se ha incluido tanto la semilla que emplearemos más tarde en la creación de los datos de test y de entrenamiento así como los nombres de los archivos y la ruta de acceso, de esta forma podemos leer los datos con el siguiente código:
 
 ```{r datos,message=FALSE,warning=FALSE}
 # Ahora ya se importan los datos a formato data.frame
 library(readr)
+
 peptidos <- read_delim(file=file.path(params$folder.data,params$file1),
                        ";", escape_double = FALSE, trim_ws = TRUE ) 
 length(complete.cases(peptidos)) # comprobamos que el dataset está completo
@@ -169,7 +183,7 @@ Si no disponemos de esta posibilidad, se puede crear un chunk donde se realice l
 
 Empezamos echando un breve vistazo a los datos descargados y así tener una idea clara las características de los datos con los que estamos trabajando.
 
-```{r}
+```{r datos2, fig.height=4}
 str(peptidos)
 head(peptidos)
 
@@ -184,17 +198,32 @@ ggplot(data = peptidos, aes(x = label, y = ..count.., fill = label)) +
 table(peptidos$label)
 ```
 
-Nuestro dataframe está compuesto por 15840 observaciones de 2 variables de caracteres, representando la primera de ellas la secuencia del peptido y la segunda el factor que nos indica si la secuencia peptídica interacciona o no con MHCI. Como vemos tenemos el mismo numero de sucencias que interaccionan como secuencias sin interacción.
+Nuestro dataframe está compuesto por 15840 observaciones de 2 variables de caracteres, representando la primera de ellas la secuencia del peptido y la segunda el factor que nos indica si la secuencia peptídica interacciona o no con MHCI. Como vemos, tenemos el mismo número de sucencias que interaccionan tanto como secuencias sin interacción.
 
-Para representar estos datos, podemos emplear su secuencia logo (https://en.wikipedia.org/wiki/Sequence_logo) con la ayuda del paquete `ggseqlogo`. Un logotipo de secuencia consiste en una pila de letras en cada posición. Los tamaños relativos de las letras indican su frecuencia en las secuencias. La altura total de las letras representa el contenido de la información de la posición, en bits.
+Para representar estos datos, podemos emplear su secuencia logo (https://en.wikipedia.org/wiki/Sequence_logo) con la ayuda del paquete `ggseqlogo`[@ggseqlogo]. Un logotipo de secuencia consiste en una pila de letras en cada posición. Los tamaños relativos de las letras indican su frecuencia en las secuencias. La altura total de las letras representa el contenido de la información de la posición, en bits o frecuencia.
 
-```{r secuencialogo, warning=FALSE,message=FALSE,tidy=TRUE,fig.height=4}
-# Plot a single DNA sequence logo
+Los logotipos de secuencia se han convertido en un método de visualización crucial para estudiar los patrones de secuencia subyacentes en el genoma. ggseqlogo es un paquete R construido en el paquete ggplot2 que permite realizar ilustraciones de secuencias de ADN, ARN y proteínas listos para publicación de una manera altamente personalizable con características que incluyen gráficos de múltiples logotipos, esquemas de color cualitativos y cuantitativos, anotaciones de logotipos e integración con otros gráficos [@ggseqlogo].
+
+Podemos dibujar una secuencia de logos de nuestros datos usando la función *ggplot* y con *geom_logo*:
+
+```{r secuencialogo, fig.height=4}
+library(ggplot2)
+library(ggseqlogo)
+ggplot() + geom_logo(peptidos$sequence) + theme_logo() + 
+facet_wrap(~seq_group, ncol=4, scales='free_x')
+```
+
+También podemos usar el paquete `ggseqlogo` como acceso directo para hacer lo mismo. Esta es una función que agrega *theme_logo* de forma predeterminada y realiza cualquier facetado requerido si se deben dibujar logotipos de secuencias múltiples. `ggseqlogo` admite dos métodos de logotipo de secuencia: 'bits' y 'probabilidad':
+
+```{r secuencialogo1, warning=FALSE,message=FALSE,tidy=TRUE,fig.height=4}
+
 library(ggseqlogo)
 pepseq<- as.vector(peptidos$sequence)
+
 ggseqlogo(pepseq,seq_type='auto', namespace = 'NULL', 
           font='helvetica_regular', col_scheme = 'nucleotide')
-ggseqlogo(peptidos$sequence, facet = "wrap")
+
+ggseqlogo(pepseq, method = 'prob')
 
 ```
 
@@ -225,7 +254,7 @@ convert <- function(l) {
 
 ## Secuencias de aminoácidos en vectores numéricos
 
-Empleando la función creada en el apartado anterior, transformamos las secuencias de aminoácidos en vectores numéricos y estos en un data frame que podamos emplear en los siguientes pasos, al que denominamos *dataset*.
+Empleando la función creada en el apartado anterior, transformamos las secuencias de aminoácidos en vectores numéricos y estos en un data frame que podamos emplear en los siguientes pasos, al que denominamos *data.pep*.
 
 ```{r convert, message=FALSE, warning=FALSE}
 
@@ -242,11 +271,11 @@ data.pep[indx] <- lapply(data.pep[indx], function(x) as.numeric(as.character(x))
 
 ```
 
-Creamos y guardamos un archivo csv para poder utilizarlo posteriormente:
+Creamos y guardamos un archivo csv para poder utilizarlo posteriormente y lo denominamos *peptidos_transf_one_hot1.csv*:
 
-```{r eval=FALSE, include=TRUE}
-write.csv(data.pep, "./dataset/peptidos_transf_one_hot1.csv", 
-          sep = ",", col.names = FALSE, row.names = FALSE)
+```{r datapep, eval=FALSE, include=TRUE}
+#write.csv(data.pep, "./dataset/peptidos_transf_one_hot1.csv", 
+#          sep = ",", col.names = FALSE, row.names = FALSE)
 ```
 
 
@@ -304,7 +333,7 @@ dim(data.nn.test)
 
 Para la construcción de la red neuronal artificial se usa la función `neuralnet()` del paquete *neuralnet*:
 
-La fórmula del modelo tiene `r ncol(data.nn)` nodos de entrada y `nlevels(peptidos$label)` nodos de salida:
+La fórmula del modelo tiene 2 (número de columnas de `data.nn`) nodos de entrada y 2 (niveles de `peptidos$label`) nodos de salida:
 
 **Con un nodo**
 
@@ -337,7 +366,7 @@ Podríamos también representar el mismo modelo usando el paquete *NeuralNetTool
 
 ```{r NeuralNetTools,warning=FALSE,message=FALSE,tidy=TRUE}
 library(NeuralNetTools)
-# plotnet(nn.model.1,  prune_col = 'lightblue', alpha=0.6)
+#plotnet(nn.model.1,  prune_col = 'lightblue', alpha=0.6)
 ```
 
 El resultado de la matriz de confusión con los datos de test en este modelo podemos obtenerla:
@@ -362,7 +391,7 @@ library(e1071)
 
 ```
 
-**con tres nodos**
+**Con tres nodos**
 
 El primer modelo fue con *un nodo* en la capa oculta. Ahora se plantea *3 nodos* en la capa oculta para tratar de mejorar el rendimiento.
 
@@ -379,9 +408,7 @@ plot(nn.model.3, rep='best')
 
 ```
 
-### Paso 4. Comentar los resultados
-
-El resultado de la matriz de confusión con los datos de test en el último modelo con tres nodos sería:
+El resultado de la matriz de confusión con los datos de test:
 
 ```{r Mconfusion3,warning=FALSE,message=FALSE,tidy=TRUE}
 nn.model.3.matrix <- predict(nn.model.3, data.nn.test[,1:180])
@@ -396,9 +423,11 @@ library(e1071)
 (cmatrix3 <- confusionMatrix(res,positive="SB"))
 ```
 
+### Paso 4. Comentar los resultados
+
 El nuevo modelo con 3 nodos ocultos obtiene una precisión de `r round(cmatrix3$overall["Accuracy"], 3)` y una sensitividad y especificidad de `r round(cmatrix3$byClass["Sensitivity"], 3)` y `r round(cmatrix3$byClass["Specificity"], 3)` respectivamente. `r if(cmatrix1$overall["Accuracy"] > cmatrix3$overall["Accuracy"]){"Vemos que el modelo obtenido con un solo nodo tiene una mayor precisión"}``r if(cmatrix1$overall["Accuracy"] < cmatrix3$overall["Accuracy"]){"Vemos que el modelo obtenido con tres nodo tiene una mayor precision"}``r if(cmatrix1$overall["Accuracy"] == cmatrix3$overall["Accuracy"]){"Vemos que ambos modelos tienen la misma precision"}`
 
-Al comparar los dos modelos vemos que obtenemos resultados muy similares, por lo que escogemos el modelo más sencillo, de forma que podamos equilibrar la complejidad y la precisión del modelo. Los modelos más complejos también son más susceptibles de tener overfitting.
+Además, el modelo con mayor precisión también es el modelo más sencillo. Los modelos más complejos también son más susceptibles de tener overfitting.
 
 ### Paso 5. Modelo mlp con el paquete caret
 
@@ -415,7 +444,8 @@ set.seed(params$seed.train)
 data.Train <- createDataPartition(y=peptidos$label, 
                         p=0.66666666666666667, list=FALSE)
 dim(data.Train)
-# Dataset codificado con la variable label como variable 181
+
+# Creamos el dataset codificado con la variable label como variable 181
 data.label <- cbind(data.nn[,1:180],Class=peptidos[,2])
 
 train.set <- data.label[data.Train,]
@@ -462,31 +492,31 @@ head(prediction.fold5.prob)
 
 ```
 
-Como vemos, con un modelo *mlp* con 3 nodos se consigue un *accuracy* de validación promedio del 99.8%.
-La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empleando la otra función, no difiere mucho de los resultados obtenidos en este modelo. Es un modelo mucho más robusto que los anteriores, sin embargo, debido al tiempo de ejecución, quizá en este caso no es necesario ejecutarlo, ya que con los modelos anteriores tenemos una buena precisión.
+En este caso, la precisión se utilizó para seleccionar el modelo óptimo utilizando el valor más grande 99.78%, que ocurre en el caso de 7 nodos.
+Como vemos, con un modelo *mlp* con 3 nodos se consigue un *accuracy* de validación promedio del 99.76%.
+La diferencia en precisión con los modelos anteriores de 1 y 3 nodos es muy leve. Aunque es un modelo mucho más robusto que los anteriores, obtenemos más precisión con el modelo más sencillo, es decir, con un único nodo.
 
 ## Algoritmo Support Vector Machine
 ### Paso 1. Leer los datos transformados
 
-Podemos emplear directamente el archivo creado en los pasos anteriores *dataset* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso, para no ir arrastrando errores en caso de que los haya:
+Podemos emplear directamente el archivo creado en los pasos anteriores *data.pep* o cargar los datos desde la carpeta donde los hemos creado. Seguiremos este segundo paso:
 
 ```{r message=FALSE, warning=FALSE}
-library(readr)
 
 # Mis datos
-data.nn <- read_csv("dataset/peptidos_transf_one_hot1.csv")
 
-# Para  tener un primer contacto con los datos, se presenta 
-# los seis primeros registros y las ultimas 5 variables, 
-# así como las dimensiones de la tabla que hemos importado:
-
+data.nn <- read_delim(file=file.path(params$folder.data,params$file2),
+                       ",", trim_ws = TRUE )
+length(complete.cases(data.nn))
 dim(data.nn)
-head(dataset[,(ncol(dataset)-4):ncol(dataset)])
+
+# Las caracteristicas de los datos las hemos visto en apartados anteriores.
+
 ```
 
 ### Paso 2. Partición de los datos en training/test
 
-Empleamos las variables binarias de base de datos transformada con la variable categorica *label* como ultima variable, al igual que hemos realizado para el modelo de red neuronales con el paquete `caret`.
+Empleamos las variables binarias de base de datos transformada con la variable categorica *label* como última variable, al igual que hemos realizado para el modelo de red neuronales con el paquete `caret`.
 
 ```{r}
 #Partición de datos
@@ -499,7 +529,8 @@ data.label$label <- as.factor(data.label$label)
 
 n <- nrow(data.nn)
 
-# El 75% de los datos lo usamos para el entrenamiento 
+# El 75% de los datos lo usamos para el entrenamiento
+# empleamos el porcentaje indicado en el encabezado, p.train = 2/3
 train <- sample(n,floor(n*params$p.train)) 
 dataset.train <- data.label[train,]
 dataset.test  <- data.label[-train,]
@@ -507,15 +538,13 @@ dataset.test  <- data.label[-train,]
 head(dataset.train[,(ncol(dataset.train)-4):ncol(dataset.train)])
 ```
 
-El porcentaje de muestras tumorales en los datos de training es de `r round((table(dataset.train$y)[1]/ nrow(dataset.train))*100,2)`%, y en los de test de `r round((table(dataset.test$y)[1]/ nrow(dataset.test))*100,2)`%. Si el tamaño de la muestra es bajo, podríamos emplear otros métodos como k-fold cross validation o bootstrap.
-
 ### Paso 3. Función lineal y Gaussiana en el modelo SVM
 
-El algoritmo de SVM que podemos emplear es la función `ksvm()` del paquete *kernlab*. Aunque hay otras opciones, como la funcion svm() del paquete `e1071` identifica automáticamente si se trata de un problema de clasificación, la variable respuesta es de tipo factor, o de regresión, la variable respuesta es tipo numérico. 
+El algoritmo de SVM que podemos emplear es la función `ksvm()` del paquete *kernlab*. Aunque hay otras opciones, como la funcion svm() del paquete `e1071` que identifica automáticamente si se trata de un problema de clasificación o regresión y si la variable respuesta es de tipo factor o de tipo numérico.
 
 **Modelo lineal**
 
-Para garantizar que los resultados sean reproducibles, incluimos la siguiente semilla, como tenemos el valor de la semilla incluida en el encabezado `YAML` del documento, solo debemos llamarla con el siguiente script.
+Para garantizar que los resultados sean reproducibles, incluimos la siguiente semilla; como tenemos el valor de la semilla incluida en el encabezado `YAML` del documento, solo debemos llamarla con el siguiente script.
 Se construye el modelo más sencillo: lineal, usando como kernel el valor `vanilladot`
 
 ```{r SVMlineal, warning=FALSE, message=FALSE}
@@ -525,7 +554,7 @@ set.seed(params$seed.clsfier) # garantiza resultados reproducibles
 # se tiene que indicar que la función kernel es lineal.
 model.svm <- ksvm(label~.,data=dataset.train, kernel='vanilladot')
 
-# look at basic information about the model
+# Vemos la información básica del modelo
 model.svm
 ```
 
@@ -545,7 +574,7 @@ El modelo de SVM lineal con categoria positiva 'SB'(interacción péptido MHCI) 
 
 **Modelo RBF**
 
-Ahora trataremos de mejorar el rendimiento de nuestro modelo implementando un SVM pero con un el kernel Gaussiano, `rbfdot`. Tambien se podría aplicar la funcion `tune` del paquete `e1701`.
+Ahora trataremos de mejorar el rendimiento de nuestro modelo implementando un SVM pero con un kernel Gaussiano, `rbfdot`. Tambien se podría aplicar la funcion `tune` del paquete `e1701`.
 
 ```{r SVMrbf,warning=FALSE,message=FALSE,tidy=TRUE,fig.height=4  }
 set.seed(params$seed.clsfier)
@@ -574,10 +603,11 @@ res2 <- table(modelo.svm.rbf.pred, dataset.test$label)
 
 El nuevo modelo de SVM con kernel gaussiano obtiene una precisión de `r round(cmatrix2$overall["Accuracy"], 3)` y una sensitividad y especificidad de `r round(cmatrix2$byClass["Sensitivity"], 3)` y `r round(cmatrix2$byClass["Specificity"], 3)` respectivamente. `r if(cmatrix1$overall["Accuracy"] > cmatrix2$overall["Accuracy"]){"Vemos que el modelo obtenido con SVM lineal tiene una mayor precisión"}``r if(cmatrix1$overall["Accuracy"] < cmatrix2$overall["Accuracy"]){"Vemos que el modelo obtenido con SVM gaussiano tiene una mayor precisión"}``r if(cmatrix1$overall["Accuracy"] == cmatrix2$overall["Accuracy"]){"Vemos que ambos modelos tienen la misma precisión"}`
 
-Como vemos ambas tienen resultados muy similares, por lo que escogemos el modelo lineal que es mas sencillo. Debemos tratar de equilibrar la complejidad y la precisión del modelo, evitando el overfitting de los modelos complejos.
+Además, el modelo lineal que es mas sencillo, lo que ayuda a evitar en parte el overfitting de los modelos complejos.
 
 ### Paso 5. Modelo svmRBF 5-fold crossvalidation con caret
 
+Aun podemos profundizar más sobre la precisión del modelo aplicando la técnica cross-validation en la elección de los conjuntos de train y test. De esta manera minimizamos el efecto de la elección del conjunto de datos a la hora de determinar la bondad del modelo.
 Usamos los grupos de entrenamiento y test creados en el apartado anterior con la funcion `createDataPartition` para el paquete `caret`, ya que este paquete admite datos de tipo factor. 
 
 ```{r caretsvm1,warning=FALSE,message=FALSE}
@@ -618,18 +648,33 @@ prediction.rbf.fold5 <- predict(model.rbf.fold5, test.set[-181])
 res <- table(prediction.rbf.fold5, test.set$label)
 confusionMatrix(res, positive="SB")
 
-# Con la funcion "predict" también podemos obtener la probabilidad para cada clase:
-prediction.rbf.fold5.prob <- predict(model.rbf.fold5, test.set[-181], type="prob")  
-head(prediction.rbf.fold5.prob)
-
 ```
 
-Como vemos, con un modelo mlp con 3 nodos se consigue un accuracy de validación promedio del 99.8%.
-La diferencia en precisión con los modelos anteriores de 1 y 3 nodos, pero empleando la otra función, no difiere mucho de los resultados obtenidos en este modelo. Es un modelo mucho más robusto que los anteriores, sin embargo, debido al tiempo de ejecución, quizá en este caso no es necesario, ya que con los modelos anteriores tenemos una buena "accuracy".
+Como vemos, con un modelo mlp con 3 nodos se consigue un accuracy de validación promedio del 99.41%.
+Hay una leve diferencia en precisión con los modelos anteriores de 1 y 3 nodos, que dan una precisión algo superior. Sin embargo, es un modelo mucho más robusto que los anteriores, pero debido al tiempo de ejecución, quizá en este caso no es necesario su aplicación.
 
 ## Discusión final
 
-En este tipo de escenario, en el que el número de predictores es varios órdenes de magnitud mayor que el de observaciones, los modelos son proclives a sufrir overfitting. Esto sugiere que, de entre los diferentes tipos de kernels, sea adecuado emplear el de menor flexibilidad, el kernel lineal. El único hiperparámetro de un SVM con kernel lineal es el valor de penalización C
+Tanto los modelos de redes neuronales artificiales (NNA) como las máquinas de soporte vectorial (SVM) son aplicables en este estudio, debido a su capacidad para clasificar datos y representar relaciones desconocidas a partir de los mismos datos. En primera instancia, se puede enfatizar que los 2 modelos mostraron resultados satisfactorios. La mejor precisión de pronóstico para las NNA y las SVM fue de 99.89% y 99.85 % respectivamente, ambos en los modelos más sencillos.
+
+Para evaluar los métodos, se analizan las matrices de confusión para cada problema y en cada método. Una matriz de confusión mide el número de clasificaciones que se realizan correctamente y también las clasificaciones que pertenecen a una clase y que se asumen como otra, y de estas pueden extraerse indicadores como la precisión, la exactitud, la sensibilidad y la especificidad, indicadores claros del desempeño de un clasificador automático.
+
+
+| **modelo** | **Accuracy** | **Sensitivity** | **Specificity** | **kappa** | **SB+** |
+|----- |:-----|:-----|:-----|:-----|:-----|
+|ANN 1 nodo | 0.9989 | 0.9996 | 0.9981 | 0.9977| 2620 |
+|ANN 3 nodos | 0.9979 | 0.9992 | 0.9966 | 0.9958 | 2619 |
+|caret 'mlp' | 0.9976 |  |  | 0.9953 | 2639 |
+|SVM lineal | 0.9985 | 0.9989 | 0.9981 | 0.9970 | 2618 |
+|SVM radial | 0.9949 | 1.0000 | 0.9898 | 0.9898 | 2621 |
+|caret svmRBF | 0.9941 | 1.0000 | 0.9883 | 0.9883 | 2640 |
+
+
+Indiferentemente de los resultados del experimento, se debe tener en cuenta un punto a favor de utilizar modelos de SVM: el algoritmo detrás del modelo permite ajustarse a problemas no lineales y la solución se realiza bajo programación cuadrática, lo cual hace que su solución sea única y generalizable.
+
+Otro aspecto relevante que se obtuvo del experimento fue determinar qué funciones kernel eran las que mejor se adaptaban al modelo de SVM. Se implementaron dos funciones kernel (base radial y lineal). Los resultados revelaron que el mejor desempeño de las SVM se obtuvo aplicando kernels de base lineal - RBF (99.85 %). Por otro lado, en este tipo de escenario, en el que el número de predictores es varios órdenes de magnitud mayor que el de observaciones, los modelos son proclives a sufrir overfitting. Esto sugiere que, de entre los diferentes tipos de kernels, sea adecuado emplear el de menor flexibilidad, el kernel lineal.
+
+Por lo que tanto el modelo NNA de un nodo como el modelo SVM de kernel lineal serian aplicables en nuestro caso y nos proporcinan una alta precisión en los resultados. 
 
 # Bibliografía
 
